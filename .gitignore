@@ -201,4 +201,3 @@ o.*
 *.sh
 video_dir/
 log/
-*.py
