@@ -186,6 +186,10 @@ _C.TASK.FOW_MAP.TYPE = "FowMap"
 _C.TASK.FOW_MAP.VISIBILITY_DIST = 6.0
 _C.TASK.FOW_MAP.FOV = 80
 
+_C.TASK.PICTURE_MAP = CN()
+_C.TASK.PICTURE_MAP.VISIBILITY_DIST = 6.0
+_C.TASK.PICTURE_MAP.FOV = 80
+
 # -----------------------------------------------------------------------------
 # TopDownMap MEASUREMENT
 # -----------------------------------------------------------------------------
@@ -206,6 +210,28 @@ _C.TASK.TOP_DOWN_MAP.DRAW_VIEW_POINTS = True
 _C.TASK.TOP_DOWN_MAP.DRAW_GOAL_POSITIONS = True
 # Axes aligned bounding boxes
 _C.TASK.TOP_DOWN_MAP.DRAW_GOAL_AABBS = True
+
+# -----------------------------------------------------------------------------
+# PictureRangeMap MEASUREMENT
+# -----------------------------------------------------------------------------
+_C.TASK.PICTURE_RANGE_MAP = CN()
+_C.TASK.PICTURE_RANGE_MAP.TYPE = "PictureRangeMap"
+_C.TASK.PICTURE_RANGE_MAP.MAX_EPISODE_STEPS = _C.ENVIRONMENT.MAX_EPISODE_STEPS
+_C.TASK.PICTURE_RANGE_MAP.MAP_PADDING = 3
+_C.TASK.PICTURE_RANGE_MAP.NUM_TOPDOWN_MAP_SAMPLE_POINTS = 20000
+_C.TASK.PICTURE_RANGE_MAP.MAP_RESOLUTION = 1250
+_C.TASK.PICTURE_RANGE_MAP.DRAW_SOURCE = True
+_C.TASK.PICTURE_RANGE_MAP.DRAW_BORDER = True
+_C.TASK.PICTURE_RANGE_MAP.DRAW_SHORTEST_PATH = True
+_C.TASK.PICTURE_RANGE_MAP.FOG_OF_WAR = CN()
+_C.TASK.PICTURE_RANGE_MAP.FOG_OF_WAR.DRAW = True
+_C.TASK.PICTURE_RANGE_MAP.FOG_OF_WAR.VISIBILITY_DIST = 5.0
+_C.TASK.PICTURE_RANGE_MAP.FOG_OF_WAR.FOV = 90
+_C.TASK.PICTURE_RANGE_MAP.DRAW_VIEW_POINTS = True
+_C.TASK.PICTURE_RANGE_MAP.DRAW_GOAL_POSITIONS = True
+# Axes aligned bounding boxes
+_C.TASK.PICTURE_RANGE_MAP.DRAW_GOAL_AABBS = True
+
 # -----------------------------------------------------------------------------
 # COLLISIONS MEASUREMENT
 # -----------------------------------------------------------------------------

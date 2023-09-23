@@ -1577,27 +1577,28 @@ class PPOTrainerO(BaseRLTrainerOracle):
 
             self.envs.close()
             
-    def _check_percentage_of_fog(self, fog_map, pre_fog_map, threshold=0.5, resolution=(300, 300)):
+    def _check_percentage_of_fog(self, fog_map, pre_fog_map, threshold=0.25, resolution=(300, 300)):
         y, x = resolution
         num = 0 #fog_mapのMAP_VALID_POINTの数
         num_covered = 0 #pre_fog_mapと被っているグリッド数
-        #logger.info("SHAPE:")
-        #logger.info(x)
-        #logger.info(y)
+        
         for i in range(y):
             for j in range(x):
-                if fog_map[i][j] == maps.MAP_VALID_POINT:
+                if fog_map[i][j] == 1:
                     num += 1
-                    if pre_fog_map[i][j] == maps.MAP_VALID_POINT:
+                    if pre_fog_map[i][j] == fog_map[i][j]:
                         num_covered += 1
                         
-        per = num_covered / num
+        if num == 0:
+            per = 0.0
+        else:
+            per = num_covered / num
         #logger.info("PERCENTAGE: " + str(per))
         
         if per < threshold:
-            return True
+            return True, per
         else:
-            return False
+            return False, per
 
     def _eval_checkpoint(
         self,
@@ -1745,6 +1746,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
             exp_area = []
             matrics = []
             fog_of_war_map = []
+            top_down_map = []
             n_envs = self.envs.num_envs
             for i in range(n_envs):
                 reward.append(rewards[i][0][0])
@@ -1752,38 +1754,40 @@ class PPOTrainerO(BaseRLTrainerOracle):
                 exp_area.append(rewards[i][0][2])
                 matrics.append(rewards[i][1])
                 fog_of_war_map.append(rewards[i][2])
+                top_down_map.append(rewards[i][3])
             
-            flag = False
             for n in range(len(observations)):
                 #TAKE_PICTUREが呼び出されたかを検証
-                flag = False
                 if ci[n] != -sys.float_info.max:
                     self._take_picture += 1
                     position = [sublist[1] for sublist in self._taken_picture_list[n]]
                     pre_fog_of_war_map = [sublist[2] for sublist in self._taken_picture_list[n]]
-                    #写真を撮ったことがある場所で写真を撮っていたら、無効
+                    #同じような範囲の写真を撮っていたら、無効
+                    idx = -1
+                    max_per = -1.0
                     for k in range(len(position)):
-                        if self._check_percentage_of_fog(fog_of_war_map[n], pre_fog_of_war_map[k]):
+                        check, per = self._check_percentage_of_fog(fog_of_war_map[n], pre_fog_of_war_map[k])
+                        if check:
                         #if (observations[n]["agent_position"][0]==position[k][0]) and (observations[n]["agent_position"][1]==position[k][1]) and (observations[n]["agent_position"][2]==position[k][2]):
-                            flag = True
-                            #同じ場所でもciが大きければ入れ替え
+                            #同じ範囲でもciが大きければ入れ替え
                             if ci[n] > self._taken_picture_list[n][k][0]:
-                                ci_pre = self._taken_picture_list[n][k][0]
-                                self._taken_picture_list[n][k] = [ci[n], observations[n]["agent_position"], fog_of_war_map[n]]
-                                self._taken_picture[n][k] = observations[n]["rgb"]
-                        
-                                reward[n] += (ci[n] - ci_pre)
-                                break
-                            #小さかったら入れ替えない
-                            else:
-                                break
-                    if flag:
+                                if max_per < per:
+                                    max_per = per
+                                    idx = k 
+                      
+                    if max_per > 0:     
+                        ci_pre = self._taken_picture_list[n][idx][0]
+                        self._taken_picture_list[n][idx] = [ci[n], observations[n]["agent_position"], fog_of_war_map[n], top_down_map[n]]
+                        self._taken_picture[n][idx] = observations[n]["rgb"]   
+                        reward[n] += (ci[n] - ci_pre)     
                         continue
                 
+                    #範囲が被っていなくて、self._num_picture回未満写真を撮っていたら
                     if len(self._taken_picture_list[n]) != self._num_picture:
-                        self._taken_picture_list[n].append([ci[n], observations[n]["agent_position"], fog_of_war_map[n]])
+                        self._taken_picture_list[n].append([ci[n], observations[n]["agent_position"], fog_of_war_map[n], top_down_map[n]])
                         self._taken_picture[n].append(observations[n]["rgb"])
                         reward[n] += ci[n]
+                    #範囲が被っていなくて、self._num_picture回以上写真を撮っていたら
                     else:
                         min = ci[n]
                         index = -1
@@ -1795,7 +1799,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
                         if index != -1:
                             #入れ替え
                             ci_pre = self._taken_picture_list[n][index][0]
-                            self._taken_picture_list[n][index] = [ci[n], observations[n]["agent_position"], fog_of_war_map[n]]
+                            self._taken_picture_list[n][index] = [ci[n], observations[n]["agent_position"], fog_of_war_map[n], top_down_map[n]]
                             self._taken_picture[n][index] = observations[n]["rgb"]
 
                             reward[n] += (ci[n] - ci_pre) 
@@ -1831,6 +1835,8 @@ class PPOTrainerO(BaseRLTrainerOracle):
                 # episode ended
                 if not_done_masks[i].item() == 0:
                     self._area += exp_area[i].item()
+                    eval_take_picture_writer.write(str(len(stats_episodes)) + "," + str(current_episodes[i].episode_id) + "," + str(n))
+                    eval_picture_position_writer.write(str(len(stats_episodes)) + "," + str(current_episodes[i].episode_id) + "," + str(n))
                     for j in range(self._num_picture):
                         if j < len(self._taken_picture_list[i]):
                             eval_take_picture_writer.write(str(self._taken_picture_list[i][j][0]))
@@ -1867,11 +1873,6 @@ class PPOTrainerO(BaseRLTrainerOracle):
                         current_episodes[i].episode_id
                     ] = infos[i]["raw_metrics"]
 
-                    # traj_metrics_episodes[
-                    #     current_episodes[i].scene_id + '.' + 
-                    #     current_episodes[i].episode_id
-                    # ] = infos[i]["traj_metrics"]
-
                     if len(self.config.VIDEO_OPTION) > 0:
                         if len(rgb_frames[i]) == 0:
                             frame = observations_to_image(observations[i], infos[i], actions[i].cpu().numpy())
@@ -1882,9 +1883,8 @@ class PPOTrainerO(BaseRLTrainerOracle):
                         metrics=self._extract_scalars_from_info(infos[i])
                         name_ci = 0.0
                         
-                        for j in range(self._num_picture):
-                            if j < len(self._taken_picture_list[i]):
-                                name_ci += self._taken_picture_list[i][j][0]
+                        for j in range(len(self._taken_picture_list[i])):
+                            name_ci += self._taken_picture_list[i][j][0]
                         
                         name_ci = str(name_ci) + "-" + str(len(stats_episodes))
                         generate_video(
@@ -1905,32 +1905,51 @@ class PPOTrainerO(BaseRLTrainerOracle):
                             if k in in_metric:
                                 metric_strs.append(f"{k}={v:.2f}")
                         
+                        #logger.info(infos[i])
                         name_p = 0.0  
-                        for j in range(self._num_picture):
-                            if j < len(self._taken_picture_list[i]):
-                                eval_picture_fog_logger = log_manager.createLogWriter("picture_fog_" + str(len(stats_episodes)) + "_" + str(current_episodes[i].episode_id) + "_" + str(n) + "_" + str(checkpoint_index) + "_" + str(j))
-                                for k in range(len(self._taken_picture_list[i][j][2])):
-                                    for l in range(len(self._taken_picture_list[i][j][2][0])):
-                                        eval_picture_fog_logger.write(str(self._taken_picture_list[i][j][2][k][l]))
+                        eval_picture_test_logger = log_manager.createLogWriter("picture_test_" + str(len(stats_episodes)) + "_" + str(current_episodes[i].episode_id) + "_" + str(n) + "_" + str(checkpoint_index))
+                        eval_picture_test_fog_logger = log_manager.createLogWriter("picture_test_fog_" + str(len(stats_episodes)) + "_" + str(current_episodes[i].episode_id) + "_" + str(n) + "_" + str(checkpoint_index))
+                            
+                        for k in range(len(infos[i]["top_down_map"]["map"])):
+                            for l in range(len(infos[i]["top_down_map"]["map"][0])):
+                                eval_picture_test_logger.write(str(infos[i]["top_down_map"]["map"][k][l]))
+                            eval_picture_test_logger.writeLine()
+                            
+                        for k in range(len(infos[i]["top_down_map"]["fog_of_war_mask"])):
+                            for l in range(len(infos[i]["top_down_map"]["fog_of_war_mask"][0])):
+                                eval_picture_test_fog_logger.write(str(infos[i]["top_down_map"]["fog_of_war_mask"][k][l]))
+                            eval_picture_test_fog_logger.writeLine()
+                            
+                        for j in range(len(self._taken_picture_list[i])):
+                            eval_picture_fog_logger = log_manager.createLogWriter("picture_fog_" + str(len(stats_episodes)) + "_" + str(current_episodes[i].episode_id) + "_" + str(n) + "_" + str(checkpoint_index) + "_" + str(j))
+                            if j == 0:
+                                eval_picture_top_logger = log_manager.createLogWriter("picture_top_" + str(len(stats_episodes)) + "_" + str(current_episodes[i].episode_id) + "_" + str(n) + "_" + str(checkpoint_index))
+                
+                            for k in range(len(self._taken_picture_list[i][j][2])):
+                                for l in range(len(self._taken_picture_list[i][j][2][0])):
+                                    eval_picture_fog_logger.write(str(self._taken_picture_list[i][j][2][k][l]))
+                                    if j == 0:
+                                        eval_picture_top_logger.write(str(self._taken_picture_list[i][j][3][k][l]))
                                     eval_picture_fog_logger.writeLine()
+                                if j == 0:
+                                    eval_picture_top_logger.writeLine()
                                 
-                                
-                                name_p = self._taken_picture_list[i][j][0]
-                                picture_name = "episode=" + str(len(stats_episodes))+ "-" + str(current_episodes[i].episode_id)+ "-ckpt=" + str(checkpoint_index) + "-" + str(j) + "-" + str(name_p)
-                                dir_name = "./taken_picture/" + date 
-                                if not os.path.exists(dir_name):
-                                    os.makedirs(dir_name)
+                            name_p = self._taken_picture_list[i][j][0]
+                            picture_name = "episode=" + str(len(stats_episodes))+ "-" + str(current_episodes[i].episode_id)+ "-ckpt=" + str(checkpoint_index) + "-" + str(j) + "-" + str(name_p)
+                            dir_name = "./taken_picture/" + date 
+                            if not os.path.exists(dir_name):
+                                os.makedirs(dir_name)
                         
-                                picture = self._taken_picture[i][j]
-                                plt.figure()
-                                ax = plt.subplot(1, 1, 1)
-                                ax.axis("off")
-                                plt.imshow(picture)
-                                plt.subplots_adjust(left=0.1, right=0.95, bottom=0.05, top=0.95)
-                                path = dir_name + "/" + picture_name + "-" + str(len(stats_episodes)) + ".png"
+                            picture = self._taken_picture[i][j]
+                            plt.figure()
+                            ax = plt.subplot(1, 1, 1)
+                            ax.axis("off")
+                            plt.imshow(picture)
+                            plt.subplots_adjust(left=0.1, right=0.95, bottom=0.05, top=0.95)
+                            path = dir_name + "/" + picture_name + ".png"
                         
-                                plt.savefig(path)
-                                logger.info("Picture created: " + path)
+                            plt.savefig(path)
+                            logger.info("Picture created: " + path)
                         
                         #Save score_matrics
                         if matrics[i] is not None:

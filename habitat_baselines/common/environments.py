@@ -177,12 +177,13 @@ class InfoRLEnv(RLEnv):
         self._previous_measure = current_measure
         matrics = None
         fog_of_war_map = None
+        self._top_down_map = None
 
         if self._take_picture():
             measure = self._env.get_metrics()[self._picture_measure_name]
             ci, matrics = measure[0], measure[1]
             ###########################
-            self._top_down_map = self._env._task.sceneMap
+            self._top_down_map = self._env.task.sceneMap
             agent_position = self._env._sim.get_agent_state().position
             a_x, a_y = maps.to_grid(
                 agent_position[0],
@@ -197,17 +198,32 @@ class InfoRLEnv(RLEnv):
                 np.zeros_like(self._top_down_map),
                 agent_position,
                 self.get_polar_angle(),
-                fov=self._config.TASK.FOW_MAP.FOV,
-                max_line_len=self._config.TASK.FOW_MAP.VISIBILITY_DIST
+                fov=self._config.TASK.PICTURE_MAP.FOV,
+                max_line_len=self._config.TASK.PICTURE_MAP.VISIBILITY_DIST
                 * max(self._map_resolution)
                 / (self._coordinate_max - self._coordinate_min)
             )
+            
+            ##
+            #壁などをマーク付け(1: 写真を撮った範囲, 2: 不可侵領域, 3: 壁, (4:現在位置))
+            OUT_REGION = 1
+            WALL_REGION = 2
+            ##
+            x, y = self._map_resolution
+            for i in range(y):
+                for j in range(x):
+                    if self._top_down_map[i][j] == OUT_REGION:
+                        fog_of_war_map[i][j] = 2
+                    elif self._top_down_map[i][j] == WALL_REGION:
+                        fog_of_war_map[i][j] = 3
+            
+            
             #####################
             #reward += metrics
         elif self._env.task.is_found_called and self._rl_config.FALSE_FOUND_PENALTY:
             reward -= self._rl_config.FALSE_FOUND_PENALTY_VALUE
 
-        return [reward, ci, current_measure], matrics, fog_of_war_map
+        return [reward, ci, current_measure], matrics, fog_of_war_map, self._top_down_map
     
     def get_polar_angle(self):
         agent_state = self._env._sim.get_agent_state()
