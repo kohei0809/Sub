@@ -1654,7 +1654,7 @@ class PictureRangeMap(Measure):
         if self._config.FOG_OF_WAR.DRAW:
             self._fog_of_war_mask = fog_of_war.reveal_fog_of_war(
                 self._top_down_map,
-                self._fog_of_war_mask,
+                np.zeros_like(self._top_down_map),
                 agent_position,
                 self.get_polar_angle(),
                 fov=self._config.FOG_OF_WAR.FOV,
