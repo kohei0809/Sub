@@ -1151,69 +1151,89 @@ class PPOTrainerO(BaseRLTrainerOracle):
 
         t_update_stats = time.time()
         batch = batch_obs(observations, device=self.device)
-        """
-        rewards = torch.tensor(
-            rewards, dtype=torch.float, device=current_episode_reward.device
-        )
-        """
         
         reward = []
         ci = []
-        exp_area = []
+        exp_area = [] # 探索済みのエリア()
+        exp_area_pre = []
         matrics = []
         fog_of_war_map = []
+        top_down_map = [] 
         n_envs = self.envs.num_envs
         for i in range(n_envs):
             reward.append(rewards[i][0][0])
             ci.append(rewards[i][0][1])
             exp_area.append(rewards[i][0][2])
+            exp_area_pre.append(rewards[i][0][3])
             matrics.append(rewards[i][1])
-            fog_of_war_map.append(rewards[i][2])
+            fog_of_war_map.append(infos[i]["picture_range_map"]["fog_of_war_mask"])
+            top_down_map.append(infos[i]["picture_range_map"]["map"])
             
-        flag = False
+        
+        for i in range(n_envs):
+            logger.info("-------------")
+            logger.info(exp_area[i] - exp_area_pre[i])
+            logger.info(exp_area[i])
+            logger.info(exp_area_pre[i])
+            logger.info("*************")
+        
+            
         for n in range(len(observations)):
             #TAKE_PICTUREが呼び出されたかを検証
-            flag = False
             if ci[n] != -sys.float_info.max:
+                # 今回撮ったpicture(p_n)が保存してあるpicture(p_k)とかぶっているkを保存
+                cover_list = [] 
+                picture_range_map = self._create_picture_range_map(top_down_map[n], fog_of_war_map[n])
                 self._take_picture += 1
-                position = [sublist[1] for sublist in self._taken_picture_list[n]]
-                #写真を撮ったことがある場所で写真を撮っていたら、無効
-                for k in range(len(position)):
-                    if (observations[n]["agent_position"][0]==position[k][0]) and (observations[n]["agent_position"][1]==position[k][1]) and (observations[n]["agent_position"][2]==position[k][2]):
-                        flag = True
-                        #同じ場所でもciが大きければ入れ替え
-                        if ci[n] > self._taken_picture_list[n][k][0]:
-                            ci_pre = self._taken_picture_list[n][k][0]
-                            self._taken_picture_list[n][k] = [ci[n], observations[n]["agent_position"]]
-                            self._taken_picture[n][k] = observations[n]["rgb"]
+                # p_kのそれぞれのpicture_range_mapのリスト
+                pre_fog_of_war_map = [sublist[2] for sublist in self._taken_picture_list[n]]
+                    
+                # それぞれと閾値より被っているか計算
+                idx = -1
+                min_ci = ci[n]
+                for k in range(len(pre_fog_of_war_map)):
+                    # 閾値よりも被っていたらcover_listにkを追加
+                    if self._check_percentage_of_fog(picture_range_map, pre_fog_of_war_map[k]) == True:
+                        cover_list.append(k)
+                            
+                    #ciの最小値の写真を探索(１つも被っていない時用)
+                    if min_ci < self._taken_picture_list[n][idx][0]:
+                        idx = k
+                        min_ci = self._taken_picture_list[n][idx][0]
                         
-                            reward[n] += (ci[n] - ci_pre)
-                            break
-                        #小さかったら入れ替えない
-                        else:
-                            break
-                if flag:
-                    continue
-                
-                if len(self._taken_picture_list[n]) != self._num_picture:
-                    self._taken_picture_list[n].append([ci[n], observations[n]["agent_position"]])
-                    self._taken_picture[n].append(observations[n]["rgb"])
-                    reward[n] += ci[n]
+                # 今までの写真と多くは被っていない時
+                if len(cover_list) == 0:
+                    #範囲が多く被っていなくて、self._num_picture回未満写真を撮っていたらそのまま保存
+                    if len(self._taken_picture_list[n]) != self._num_picture:
+                        self._taken_picture_list[n].append([ci[n], observations[n]["agent_position"], picture_range_map])
+                        self._taken_picture[n].append(observations[n]["rgb"])
+                        reward[n] += ci[n]
+                            
+                    #範囲が多く被っていなくて、self._num_picture回以上写真を撮っていたら
+                    else:
+                        # 今回の写真が保存してある写真の１つでもCIが高かったらCIが最小の保存写真と入れ替え
+                        if idx != -1:
+                            ci_pre = self._taken_picture_list[n][idx][0]
+                            self._taken_picture_list[n][idx] = [ci[n], observations[n]["agent_position"], picture_range_map]
+                            self._taken_picture[n][idx] = observations[n]["rgb"]   
+                            reward[n] += (ci[n] - ci_pre)     
+                        
+                # 1つとでも多く被っていた時    
                 else:
-                    min = ci[n]
-                    index = -1
-                    for i in range(self._num_picture):
-                        if self._taken_picture_list[n][i][0] < min:
-                            min = self._taken_picture_list[n][i][0]
-                            index = i
-                        
-                    if index != -1:
-                        #入れ替え
-                        ci_pre = self._taken_picture_list[n][index][0]
-                        self._taken_picture_list[n][index] = [ci[n], observations[n]["agent_position"]]
-                        self._taken_picture[n][index] = observations[n]["rgb"]
-
-                        reward[n] += (ci[n] - ci_pre) 
+                    min_idx = -1
+                    min_ci_k = 1000
+                    # 多く被った写真のうち、ciが最小のものを計算
+                    for k in range(len(cover_list)):
+                        idx_k = cover_list[k]
+                        if self._taken_picture_list[n][idx_k][0] < min_ci_k:
+                            min_ci_k = self._taken_picture_list[n][idx_k][0]
+                            min_idx = idx_k
+                                
+                    # 被った割合分小さくなったCIでも保存写真の中の最小のCIより大きかったら交換
+                    if self._compareWithChangedCI(picture_range_map, pre_fog_of_war_map, cover_list, ci[n], min_ci_k, min_idx) == True:
+                        self._taken_picture_list[n][min_idx] = [ci[n], observations[n]["agent_position"], picture_range_map]
+                        self._taken_picture[n][min_idx] = observations[n]["rgb"]   
+                        reward[n] += (ci[n] - min_ci_k)  
             
         reward = torch.tensor(
             reward, dtype=torch.float, device=current_episode_reward.device
@@ -1249,10 +1269,10 @@ class PPOTrainerO(BaseRLTrainerOracle):
 
         current_episode_reward += reward
         running_episode_stats["reward"] += (1 - masks) * current_episode_reward
-        current_episode_exp_area += exp_area-self.pre_area
+        current_episode_exp_area = exp_area
         running_episode_stats["exp_area"] += (1 - masks) * current_episode_exp_area
         running_episode_stats["count"] += 1 - masks
-        self.pre_area = exp_area
+
         for k, v in self._extract_scalars_from_infos(infos).items():
             v = torch.tensor(
                 v, dtype=torch.float, device=current_episode_reward.device
@@ -1266,6 +1286,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
 
     
         current_episode_reward *= masks
+        current_episode_exp_area *= masks
 
         if self._static_encoder:
             with torch.no_grad():
@@ -1386,7 +1407,6 @@ class PPOTrainerO(BaseRLTrainerOracle):
 
         current_episode_reward = torch.zeros(self.envs.num_envs, 1)
         current_episode_exp_area = torch.zeros(self.envs.num_envs, 1)
-        self.pre_area = torch.zeros(self.envs.num_envs, 1)
         running_episode_stats = dict(
             count=torch.zeros(self.envs.num_envs, 1),
             reward=torch.zeros(self.envs.num_envs, 1),
@@ -1577,31 +1597,8 @@ class PPOTrainerO(BaseRLTrainerOracle):
 
             self.envs.close()
             
-    def _check_percentage_of_fog(self, fog_map, pre_fog_map, threshold=0.25):
-        y = len(fog_map)
-        x = len(fog_map[0])
-        
-        num = 0 #fog_mapのMAP_VALID_POINTの数
-        num_covered = 0 #pre_fog_mapと被っているグリッド数
-        
-        for i in range(y):
-            for j in range(x):
-                if fog_map[i][j] == 1:
-                    num += 1
-                    if pre_fog_map[i][j] == fog_map[i][j]:
-                        num_covered += 1
-                        
-        if num == 0:
-            per = 0.0
-        else:
-            per = num_covered / num
-        #logger.info("PERCENTAGE: " + str(per))
-        
-        if per < threshold:
-            return True, per
-        else:
-            return False, per
-        
+            
+    # 写真を撮った範囲のマップを作成
     def _create_picture_range_map(self, top_down_map, fog_of_war_map):
         # 0: 壁など, 1: 写真を撮った範囲, 2: 巡回可能領域
         picture_range_map = np.zeros_like(top_down_map)
@@ -1614,7 +1611,76 @@ class PPOTrainerO(BaseRLTrainerOracle):
                         picture_range_map[i][j] = 2
                         
         return picture_range_map
+            
+    # fog_mapがpre_fog_mapと閾値以上の割合で被っているか
+    def _check_percentage_of_fog(self, fog_map, pre_fog_map, threshold=0.25):
+        y = len(fog_map)
+        x = len(fog_map[0])
+        
+        num = 0 #fog_mapのMAP_VALID_POINTの数
+        num_covered = 0 #pre_fog_mapと被っているグリッド数
+        
+        for i in range(y):
+            for j in range(x):
+                # fog_mapで写真を撮っている範囲の時
+                if fog_map[i][j] == 1:
+                    num += 1
+                    # fogとpre_fogがかぶっている時
+                    if pre_fog_map[i][j] == 1:
+                        num_covered += 1
+                        
+        if num == 0:
+            per = 0.0
+        else:
+            per = num_covered / num
+        
+        if per < threshold:
+            return False
+        else:
+            return True
+        
+    # fog_mapがidx以外のpre_fog_mapと被っている割合を算出
+    def _cal_rate_of_fog_other(self, fog_map, pre_fog_of_war_map_list, cover_list, idx):
+        y = len(fog_map)
+        x = len(fog_map[0])
+        
+        num = 0.0 #fog_mapのMAP_VALID_POINTの数
+        num_covered = 0.0 #pre_fog_mapのどれかと被っているグリッド数
+        
+        for i in range(y):
+            for j in range(x):
+                # fog_mapで写真を撮っている範囲の時
+                if fog_map[i][j] == 1:
+                    num += 1
                     
+                    # 被っているmapを検査する
+                    for k in range(len(cover_list)):
+                        map_idx = cover_list[k]
+                        if map_idx == idx:
+                            continue
+                        
+                        pre_map = pre_fog_of_war_map_list[map_idx]
+                        # fogとpre_fogがかぶっている時
+                        if pre_map[i][j] == 1:
+                            num_covered += 1
+                            break
+                        
+        if num == 0:
+            rate = 0.0
+        else:
+            rate = num_covered / num
+        
+        return rate
+    
+    
+    def _compareWithChangedCI(self, picture_range_map, pre_fog_of_war_map_list, cover_list, ci, pre_ci, idx):
+        rate = self._cal_rate_of_fog_other(picture_range_map, pre_fog_of_war_map_list, cover_list, idx)
+        ci = ci * (1-rate) # k以外と被っている割合分小さくする
+        if ci > pre_ci:
+            return True
+        else:
+            return False
+        
 
     def _eval_checkpoint(
         self,
@@ -1644,7 +1710,6 @@ class PPOTrainerO(BaseRLTrainerOracle):
         eval_picture_position_writer = log_manager.createLogWriter("picture_position")
         
         self._ci = 0.0
-        self._area = 0.0
         self._take_picture = 0
         
         #フォルダがない場合は、作成
@@ -1681,8 +1746,6 @@ class PPOTrainerO(BaseRLTrainerOracle):
         self.agent.load_state_dict(ckpt_dict["state_dict"])
         self.actor_critic = self.agent.actor_critic
         
-        self.pre_area = torch.zeros(self.envs.num_envs, 1, device=self.device)
-        
         self._taken_picture = []
         self._taken_picture_list = []
         for i in range(self.envs.num_envs):
@@ -1693,6 +1756,9 @@ class PPOTrainerO(BaseRLTrainerOracle):
         batch = batch_obs(observations, device=self.device)
 
         current_episode_reward = torch.zeros(
+            self.envs.num_envs, 1, device=self.device
+        )
+        current_episode_exp_area = torch.zeros(
             self.envs.num_envs, 1, device=self.device
         )
         
@@ -1754,7 +1820,6 @@ class PPOTrainerO(BaseRLTrainerOracle):
                 device=self.device,
             )
             
-            #########################
             reward = []
             ci = []
             exp_area = []
@@ -1773,57 +1838,59 @@ class PPOTrainerO(BaseRLTrainerOracle):
             for n in range(len(observations)):
                 #TAKE_PICTUREが呼び出されたかを検証
                 if ci[n] != -sys.float_info.max:
+                    # 今回撮ったpicture(p_n)が保存してあるpicture(p_k)とかぶっているkを保存
+                    cover_list = [] 
                     picture_range_map = self._create_picture_range_map(top_down_map[n], fog_of_war_map[n])
                     self._take_picture += 1
-                    position = [sublist[1] for sublist in self._taken_picture_list[n]]
+                    # p_kのそれぞれのpicture_range_mapのリスト
                     pre_fog_of_war_map = [sublist[2] for sublist in self._taken_picture_list[n]]
-                    #同じような範囲の写真を撮っていたら、無効
+                    
+                    # それぞれと閾値より被っているか計算
                     idx = -1
-                    max_per = -1.0
-                    #初めてのtake_picture
-                    if len(pre_fog_of_war_map) == 0:
-                        self._taken_picture_list[n].append([ci[n], observations[n]["agent_position"], picture_range_map])
-                        self._taken_picture[n].append(observations[n]["rgb"])
-                        reward[n] += ci[n]
-                        
+                    min_ci = ci[n]
                     for k in range(len(pre_fog_of_war_map)):
-                        check, per = self._check_percentage_of_fog(picture_range_map, pre_fog_of_war_map[k])
-                        if check:
-                        #if (observations[n]["agent_position"][0]==position[k][0]) and (observations[n]["agent_position"][1]==position[k][1]) and (observations[n]["agent_position"][2]==position[k][2]):
-                            #同じ範囲でもciが大きければ入れ替え
-                            if ci[n] >= self._taken_picture_list[n][k][0]:
-                                if max_per < per:
-                                    max_per = per
-                                    idx = k 
-                      
-                    if max_per > 0:     
-                        ci_pre = self._taken_picture_list[n][idx][0]
-                        self._taken_picture_list[n][idx] = [ci[n], observations[n]["agent_position"], picture_range_map]
-                        self._taken_picture[n][idx] = observations[n]["rgb"]   
-                        reward[n] += (ci[n] - ci_pre)     
-                        continue
-                
-                    #範囲が被っていなくて、self._num_picture回未満写真を撮っていたら
-                    if len(self._taken_picture_list[n]) != self._num_picture:
-                        self._taken_picture_list[n].append([ci[n], observations[n]["agent_position"], picture_range_map])
-                        self._taken_picture[n].append(observations[n]["rgb"])
-                        reward[n] += ci[n]
-                    #範囲が被っていなくて、self._num_picture回以上写真を撮っていたら
-                    else:
-                        min = ci[n]
-                        index = -1
-                        for i in range(self._num_picture):
-                            if self._taken_picture_list[n][i][0] < min:
-                                min = self._taken_picture_list[n][i][0]
-                                index = i
+                        # 閾値よりも被っていたらcover_listにkを追加
+                        if self._check_percentage_of_fog(picture_range_map, pre_fog_of_war_map[k]) == True:
+                            cover_list.append(k)
+                            
+                        #ciの最小値の写真を探索(１つも被っていない時用)
+                        if min_ci < self._taken_picture_list[n][idx][0]:
+                            idx = k
+                            min_ci = self._taken_picture_list[n][idx][0]
                         
-                        if index != -1:
-                            #入れ替え
-                            ci_pre = self._taken_picture_list[n][index][0]
-                            self._taken_picture_list[n][index] = [ci[n], observations[n]["agent_position"], picture_range_map]
-                            self._taken_picture[n][index] = observations[n]["rgb"]
-
-                            reward[n] += (ci[n] - ci_pre) 
+                    # 今までの写真と多くは被っていない時
+                    if len(cover_list) == 0:
+                        #範囲が多く被っていなくて、self._num_picture回未満写真を撮っていたらそのまま保存
+                        if len(self._taken_picture_list[n]) != self._num_picture:
+                            self._taken_picture_list[n].append([ci[n], observations[n]["agent_position"], picture_range_map])
+                            self._taken_picture[n].append(observations[n]["rgb"])
+                            reward[n] += ci[n]
+                            
+                        #範囲が多く被っていなくて、self._num_picture回以上写真を撮っていたら
+                        else:
+                            # 今回の写真が保存してある写真の１つでもCIが高かったらCIが最小の保存写真と入れ替え
+                            if idx != -1:
+                                ci_pre = self._taken_picture_list[n][idx][0]
+                                self._taken_picture_list[n][idx] = [ci[n], observations[n]["agent_position"], picture_range_map]
+                                self._taken_picture[n][idx] = observations[n]["rgb"]   
+                                reward[n] += (ci[n] - ci_pre)     
+                        
+                    # 1つとでも多く被っていた時    
+                    else:
+                        min_idx = -1
+                        min_ci_k = 1000
+                        # 多く被った写真のうち、ciが最小のものを計算
+                        for k in range(len(cover_list)):
+                            idx_k = cover_list[k]
+                            if self._taken_picture_list[n][idx_k][0] < min_ci_k:
+                                min_ci_k = self._taken_picture_list[n][idx_k][0]
+                                min_idx = idx_k
+                                
+                        # 被った割合分小さくなったCIでも保存写真の中の最小のCIより大きかったら交換
+                        if self._compareWithChangedCI(picture_range_map, pre_fog_of_war_map, cover_list, ci[n], min_ci_k, min_idx) == True:
+                            self._taken_picture_list[n][min_idx] = [ci[n], observations[n]["agent_position"], picture_range_map]
+                            self._taken_picture[n][min_idx] = observations[n]["rgb"]   
+                            reward[n] += (ci[n] - min_ci_k)  
                 
             
             reward = torch.tensor(
@@ -1833,18 +1900,11 @@ class PPOTrainerO(BaseRLTrainerOracle):
             exp_area = torch.tensor(
                 exp_area, dtype=torch.float, device=self.device
             ).unsqueeze(1)
-        
-
-            masks = torch.tensor(
-                [[0.0] if done else [1.0] for done in dones],
-                dtype=torch.float,
-                device=current_episode_reward.device,
-            )
 
             current_episode_reward += reward
+            current_episode_exp_area += exp_area
             next_episodes = self.envs.current_episodes()
             envs_to_pause = []
-            #########################
 
             for i in range(n_envs):
                 if (
@@ -1855,7 +1915,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
 
                 # episode ended
                 if not_done_masks[i].item() == 0:
-                    self._area += exp_area[i].item()
+                    logger.info("Exp_area: " + str(current_episode_exp_area[i]))
                     eval_take_picture_writer.write(str(len(stats_episodes)) + "," + str(current_episodes[i].episode_id) + "," + str(n))
                     eval_picture_position_writer.write(str(len(stats_episodes)) + "," + str(current_episodes[i].episode_id) + "," + str(n))
                     for j in range(self._num_picture):
@@ -1876,11 +1936,12 @@ class PPOTrainerO(BaseRLTrainerOracle):
                     pbar.update()
                     episode_stats = dict()
                     episode_stats["reward"] = current_episode_reward[i].item()
-                    episode_stats["exp_area"] = exp_area[i].item()
+                    episode_stats["exp_area"] = current_episode_exp_area[i].item()
                     episode_stats.update(
                         self._extract_scalars_from_info(infos[i])
                     )
                     current_episode_reward[i] = 0
+                    current_episode_exp_area[i] = 0
                     # use scene_id + episode_id as unique id for storing stats
                     stats_episodes[
                         (
@@ -1991,7 +2052,6 @@ class PPOTrainerO(BaseRLTrainerOracle):
                 batch,
                 rgb_frames,
             )
-            self.pre_area = torch.zeros(self.envs.num_envs, 1, device=self.device)
 
         num_episodes = len(stats_episodes)
         
@@ -2030,7 +2090,6 @@ class PPOTrainerO(BaseRLTrainerOracle):
         eval_metrics_logger.writeLine(str(step_id) + "," +str(self._take_picture / num_episodes) + "," + str(self._ci/ num_episodes) + "," + str(metrics["exp_area"]) + "," + str(metrics["raw_metrics.agent_path_length"]))
         self._ci = 0.0
         self._take_picture = 0
-        self._area = 0.0
         
 
         ##Dump metrics JSON

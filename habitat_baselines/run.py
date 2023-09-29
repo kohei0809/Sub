@@ -120,10 +120,14 @@ def run_exp(exp_config: str, run_type: str, agent_type: str, opts=None) -> None:
 def test():
     exp_config = "habitat_baselines/config/maximuminfo/ppo_maximuminfo.yaml"
     agent_type = "oracle-ego"
-    run_type = "eval"
+    run_type = "train"
     start_date = datetime.datetime.now().strftime('%y-%m-%d %H-%M-%S') 
-    #datadate = "23-08-18 18-53-17"
-    datadate = "23-08-18 12-35-30"
+    
+    if run_type == "eval":
+        #datadate = "23-08-18 18-53-17"
+        datadate = "23-08-18 12-35-30"
+    else:
+       datadate = "" 
     
     config = get_config(exp_config)
     
