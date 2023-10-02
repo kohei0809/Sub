@@ -522,7 +522,7 @@ class ProposedNetOracle(Net):
         elif agent_type == "no-map":
             pass
         
-        self.action_embedding = nn.Embedding(4, previous_action_embedding_size)
+        self.action_embedding = nn.Embedding(3, previous_action_embedding_size)
 
         if self.use_previous_action:
             self.state_encoder = RNNStateEncoder(

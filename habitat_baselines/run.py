@@ -190,10 +190,86 @@ def test():
     end_date = datetime.datetime.now().strftime('%y-%m-%d %H-%M-%S') 
     print("Start at " + start_date)
     print("End at " + end_date)
+    
+def test2():
+    exp_config = "habitat_baselines/config/maximuminfo/ppo_maximuminfo.yaml"
+    agent_type = "oracle-ego"
+    run_type = "train"
+    start_date = datetime.datetime.now().strftime('%y-%m-%d %H-%M-%S') 
+    
+    if run_type == "eval":
+        #datadate = "23-08-18 18-53-17"
+        datadate = "23-08-18 12-35-30"
+    else:
+       datadate = "" 
+    
+    config = get_config(exp_config)
+    
+    
+    random.seed(config.TASK_CONFIG.SEED)
+    np.random.seed(config.TASK_CONFIG.SEED)
+    
+    config.defrost()
+    config.DATASET.DATA_PATH = "data/datasets/multinav/3_ON/{split}/{split}.json.gz"
+    config.TRAINER_NAME = agent_type
+    config.TASK_CONFIG.TRAINER_NAME = agent_type
+    config.CHECKPOINT_FOLDER = "cpt/" + start_date
+    config.EVAL_CKPT_PATH_DIR = "cpt/" + datadate 
+    config.freeze()
+    
+    if agent_type in ["oracle", "oracle-ego", "no-map"]:
+        trainer_init = baseline_registry.get_trainer("oracle2")
+        config.defrost()
+        config.RL.PPO.hidden_size = 512 if agent_type=="no-map" else 768
+        config.TASK_CONFIG.SIMULATOR.DEPTH_SENSOR.NORMALIZE_DEPTH = False
+        config.TASK_CONFIG.SIMULATOR.DEPTH_SENSOR.MIN_DEPTH = 0.5
+        config.TASK_CONFIG.SIMULATOR.DEPTH_SENSOR.MAX_DEPTH = 5.0
+        config.TASK_CONFIG.SIMULATOR.AGENT_0.HEIGHT = 1.5
+        if agent_type == "oracle-ego":
+            config.TASK_CONFIG.TASK.MEASUREMENTS.append('FOW_MAP')
+        config.freeze()
+    else:
+        trainer_init = baseline_registry.get_trainer("non-oracle")
+        config.defrost()
+        config.RL.PPO.hidden_size = 512
+        config.freeze()
+        
+    assert trainer_init is not None, f"{config.TRAINER_NAME} is not supported"
+    trainer = trainer_init(config)
+    
+    #ログファイルの設定   
+    log_manager_train = LogManager()
+    log_manager_train.setLogDirectory("./log/" + start_date + "/train")
+    log_manager_val = LogManager()
+    log_manager_val.setLogDirectory("./log/" + start_date + "/val")
+    
+    device = (
+        torch.device("cuda", config.TORCH_GPU_ID)
+        if torch.cuda.is_available()
+        else torch.device("cpu")
+    )
+    print("-----------------------------------")
+    print("device:" + str(device))
+    print("-----------------------------------")
+
+    if run_type == "train":
+        #フォルダがない場合は、作成
+        p_dir = pathlib.Path(config.CHECKPOINT_FOLDER)
+        if not p_dir.exists():
+            p_dir.mkdir(parents=True)
+            
+        trainer.train(log_manager_train, start_date)
+    elif run_type == "eval":
+        trainer.eval(log_manager_val, start_date)
+       
+    end_date = datetime.datetime.now().strftime('%y-%m-%d %H-%M-%S') 
+    print("Start at " + start_date)
+    print("End at " + end_date)
 
 if __name__ == "__main__":
     #main()
     test()
+    test2()
 
     #MIN_DEPTH: 0.5
     #MAX_DEPTH: 5.0
