@@ -422,15 +422,7 @@ class PPOTrainerNO(BaseRLTrainerNonOracle):
                 }
                 deltas["count"] = max(deltas["count"], 1.0)
 
-                #tensor board
-                writer.add_scalar(
-                    "train/reward", deltas["reward"] / deltas["count"], count_steps
-                )
-                writer.add_scalar(
-                    "train/learning_rate", lr_scheduler._last_lr[0], count_steps
-                )
-                
-                #csv
+
                 reward_logger.writeLine(str(count_steps) + "," + str(deltas["reward"] / deltas["count"]))
                 learning_rate_logger.writeLine(str(count_steps) + "," + str(lr_scheduler._last_lr[0]))
 
@@ -450,44 +442,14 @@ class PPOTrainerNO(BaseRLTrainerNonOracle):
                 #     total_left_actions + total_right_actions + total_look_up_actions + 
                 #     total_look_down_actions
                 # )
-                
-                # tensor board
-                writer.add_histogram(
-                    "map_encoder_cnn_0", self.actor_critic.net.map_encoder.cnn[0].weight, count_steps
-                )
-                writer.add_histogram(
-                    "map_encoder_cnn_1", self.actor_critic.net.map_encoder.cnn[2].weight, count_steps
-                )
-                writer.add_histogram(
-                    "map_encoder_cnn_2", self.actor_critic.net.map_encoder.cnn[4].weight, count_steps
-                )
-                writer.add_histogram(
-                    "map_encoder_linear", self.actor_critic.net.map_encoder.cnn[6].weight, count_steps
-                )
-                
-                # csv
+
                 map_encoder_logger.writeLine(
                     str(count_steps) + "," + str(self.actor_critic.net.map_encoder.cnn[0].weight) + ","
                     + str(self.actor_critic.net.map_encoder.cnn[2].weight) + ","
                     + str(self.actor_critic.net.map_encoder.cnn[4].weight) + ","
                     + str(self.actor_critic.net.map_encoder.cnn[6].weight)
                 )
-                
-                # tensor board
-                writer.add_histogram(
-                    "visual_encoder_cnn_0", self.actor_critic.net.visual_encoder.cnn[0].weight, count_steps
-                )
-                writer.add_histogram(
-                    "visual_encoder_cnn_1", self.actor_critic.net.visual_encoder.cnn[2].weight, count_steps
-                )
-                writer.add_histogram(
-                    "visual_encoder_cnn_2", self.actor_critic.net.visual_encoder.cnn[4].weight, count_steps
-                )
-                writer.add_histogram(
-                    "visual_encoder_linear", self.actor_critic.net.image_features_linear.weight, count_steps
-                )
-                
-                # csv
+
                 visual_encoder_logger.writeLine(
                     str(count_steps) + "," + str(self.actor_critic.net.visual_encoder.cnn[0].weight) + ","
                     + str(self.actor_critic.net.visual_encoder.cnn[2].weight) + ","
@@ -495,26 +457,6 @@ class PPOTrainerNO(BaseRLTrainerNonOracle):
                     + str(self.actor_critic.net.image_features_linear.weight)
                 )
                 
-                writer.add_scalar(
-                    "train/found_action_prob", total_found_actions/total_actions, count_steps
-                )
-                writer.add_scalar(
-                    "train/forward_action_prob", total_forward_actions/total_actions, count_steps
-                )
-                writer.add_scalar(
-                    "train/left_action_prob", total_left_actions/total_actions, count_steps
-                )
-                writer.add_scalar(
-                    "train/right_action_prob", total_right_actions/total_actions, count_steps
-                )
-                writer.add_scalar(
-                    "train/look_up_action_prob", total_look_up_actions/total_actions, count_steps
-                )
-                writer.add_scalar(
-                    "train/look_down_action_prob", total_look_down_actions/total_actions, count_steps
-                )
-                
-                # csv
                 action_logger.writeLine(
                     str(count_steps) + "," + str(total_found_actions/total_actions) + ","
                     + str(total_forward_actions/total_actions) + "," + str(total_left_actions/total_actions) + ","
@@ -528,26 +470,12 @@ class PPOTrainerNO(BaseRLTrainerNonOracle):
                 }
 
                 if len(metrics) > 0:
-                    # tensor board
-                    writer.add_scalar("metrics/distance_to_currgoal", metrics["distance_to_currgoal"], count_steps)
-                    writer.add_scalar("metrics/success", metrics["success"], count_steps)
-                    writer.add_scalar("metrics/sub_success", metrics["sub_success"], count_steps)
-                    writer.add_scalar("metrics/episode_length", metrics["episode_length"], count_steps)
-                    writer.add_scalar("metrics/distance_to_multi_goal", metrics["distance_to_multi_goal"], count_steps)
-                    writer.add_scalar("metrics/percentage_success", metrics["percentage_success"], count_steps)
-                    
-                    #csv
                     metrics_logger.writeLine(
                         str(count_steps) + "," + str(metrics["distance_to_currgoal"]) + "," + str(metrics["success"]) + "," + 
                         str(metrics["sub_success"]) + "," + str(metrics["episode_length"]) + "," + str(metrics["distance_to_multi_goal"]) + "," + 
                         str(metrics["percentage_success"])      
                     )
                     
-                # tensor board
-                writer.add_scalar("train/losses_value", value_loss, count_steps)
-                writer.add_scalar("train/losses_policy", action_loss, count_steps)
-                
-                # csv
                 loss_logger.writeLine(str(count_steps) + "," + str(value_loss) + "," + str(action_loss))
 
 
@@ -831,33 +759,15 @@ class PPOTrainerNO(BaseRLTrainerNonOracle):
         step_id = checkpoint_index
         if "extra_state" in ckpt_dict and "step" in ckpt_dict["extra_state"]:
             step_id = ckpt_dict["extra_state"]["step"]
-
-        writer.add_scalar("eval/average_reward", aggregated_stats["reward"],
-            step_id,
-        )
         
         eval_reward_logger.writeLine(str(step_id) + "," + str(aggregated_stats["reward"]))
 
         metrics = {k: v for k, v in aggregated_stats.items() if k != "reward"}
-        writer.add_scalar("eval/distance_to_currgoal", metrics["distance_to_currgoal"], step_id)
-        writer.add_scalar("eval/distance_to_multi_goal", metrics["distance_to_multi_goal"], step_id)
-        writer.add_scalar("eval/episode_length", metrics["episode_length"], step_id)
-        writer.add_scalar("eval/mspl", metrics["mspl"], step_id)
-        writer.add_scalar("eval/pspl", metrics["pspl"], step_id)
-        writer.add_scalar("eval/percentage_success", metrics["percentage_success"], step_id)
-        writer.add_scalar("eval/success", metrics["success"], step_id)
-        writer.add_scalar("eval/sub_success", metrics["sub_success"], step_id)
         
         eval_metrics_logger.writeLine(str(step_id) + "," + str(metrics["distance_to_currgoal"]) + "," + str(metrics["distance_to_multi_goal"])
                                         + "," + str(metrics["episode_length"]) + "," + str(metrics["mspl"]) + "," + str(metrics["pspl"])
                                         + "," + str(metrics["percentage_success"]) + "," + str(metrics["success"]) + "," + str(metrics["sub_success"]))
 
-        ##Dump metrics JSON
-        if 'RAW_METRICS' in config.TASK_CONFIG.TASK.MEASUREMENTS:
-            if not os.path.exists(config.TENSORBOARD_DIR_EVAL +'/metrics'):
-                os.mkdir(config.TENSORBOARD_DIR_EVAL +'/metrics')
-            with open(config.TENSORBOARD_DIR_EVAL +'/metrics/' + checkpoint_path.split('/')[-1] + '.json', 'w') as fp:
-                json.dump(raw_metrics_episodes, fp)
 
         self.envs.close()
 
@@ -1069,7 +979,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
         """
         return torch.load(checkpoint_path, *args, **kwargs)
 
-    METRICS_BLACKLIST = {"top_down_map", "collisions.is_collision", "traj_metrics"}
+    METRICS_BLACKLIST = {"top_down_map", "collisions.is_collision", "traj_metrics", "ci"}
 
     @classmethod
     def _extract_scalars_from_info(
@@ -1079,13 +989,11 @@ class PPOTrainerO(BaseRLTrainerOracle):
         for k, v in info.items():
             if k in cls.METRICS_BLACKLIST:
                 continue
-
+            """
             if k == "ci":
                 result[k] = float(v[0])
-            #print("V")
-            #print(k)
-            #print(v)
-            elif isinstance(v, dict):
+            """
+            if isinstance(v, dict):
                 result.update(
                     {
                         k + "." + subk: subv
@@ -1116,7 +1024,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
         
 
     def _collect_rollout_step(
-        self, rollouts, current_episode_reward, current_episode_exp_area, running_episode_stats
+        self, rollouts, current_episode_reward, current_episode_exp_area, current_episode_ci, running_episode_stats
     ):
         pth_time = 0.0
         env_time = 0.0
@@ -1154,18 +1062,16 @@ class PPOTrainerO(BaseRLTrainerOracle):
         
         reward = []
         ci = []
-        exp_area = [] # 探索済みのエリア()
-        exp_area_pre = []
-        matrics = []
+        exp_area = [] # 探索済みのエリアの差
+        #matrics = []
         fog_of_war_map = []
         top_down_map = [] 
         n_envs = self.envs.num_envs
         for i in range(n_envs):
             reward.append(rewards[i][0][0])
             ci.append(rewards[i][0][1])
-            exp_area.append(rewards[i][0][2])
-            exp_area_pre.append(rewards[i][0][3])
-            matrics.append(rewards[i][1])
+            exp_area.append(rewards[i][0][2]-rewards[i][0][3])
+            #matrics.append(rewards[i][1])
             fog_of_war_map.append(infos[i]["picture_range_map"]["fog_of_war_mask"])
             top_down_map.append(infos[i]["picture_range_map"]["map"])
         
@@ -1176,7 +1082,6 @@ class PPOTrainerO(BaseRLTrainerOracle):
                 # 今回撮ったpicture(p_n)が保存してあるpicture(p_k)とかぶっているkを保存
                 cover_list = [] 
                 picture_range_map = self._create_picture_range_map(top_down_map[n], fog_of_war_map[n])
-                self._take_picture += 1
                 # p_kのそれぞれのpicture_range_mapのリスト
                 pre_fog_of_war_map = [sublist[2] for sublist in self._taken_picture_list[n]]
                     
@@ -1208,7 +1113,10 @@ class PPOTrainerO(BaseRLTrainerOracle):
                             ci_pre = self._taken_picture_list[n][idx][0]
                             self._taken_picture_list[n][idx] = [ci[n], observations[n]["agent_position"], picture_range_map]
                             self._taken_picture[n][idx] = observations[n]["rgb"]   
-                            reward[n] += (ci[n] - ci_pre)     
+                            reward[n] += (ci[n] - ci_pre)  
+                            ci[n] -= ci_pre
+                        
+                        ci[n] = 0.0   
                         
                 # 1つとでも多く被っていた時    
                 else:
@@ -1225,7 +1133,12 @@ class PPOTrainerO(BaseRLTrainerOracle):
                     if self._compareWithChangedCI(picture_range_map, pre_fog_of_war_map, cover_list, ci[n], min_ci_k, min_idx) == True:
                         self._taken_picture_list[n][min_idx] = [ci[n], observations[n]["agent_position"], picture_range_map]
                         self._taken_picture[n][min_idx] = observations[n]["rgb"]   
-                        reward[n] += (ci[n] - min_ci_k)  
+                        reward[n] += (ci[n] - min_ci_k) 
+                        ci[n] -= min_ci_k
+                    
+                    ci[n] = 0.0
+            else:
+                ci[n] = 0.0 
             
         reward = torch.tensor(
             reward, dtype=torch.float, device=current_episode_reward.device
@@ -1233,6 +1146,10 @@ class PPOTrainerO(BaseRLTrainerOracle):
         exp_area = np.array(exp_area)
         exp_area = torch.tensor(
            exp_area, dtype=torch.float, device=current_episode_reward.device
+        ).unsqueeze(1)
+        ci = np.array(ci)
+        ci= torch.tensor(
+           ci, dtype=torch.float, device=current_episode_reward.device
         ).unsqueeze(1)
         
 
@@ -1249,7 +1166,6 @@ class PPOTrainerO(BaseRLTrainerOracle):
                     if i < len(self._taken_picture_list[n]):
                         self.take_picture_writer.write(str(self._taken_picture_list[n][i][0]))
                         self.picture_position_writer.write(str(self._taken_picture_list[n][i][1][0]) + "," + str(self._taken_picture_list[n][i][1][1]) + "," + str(self._taken_picture_list[n][i][1][2]))
-                        self._ci += self._taken_picture_list[n][i][0]
                     else:
                         self.take_picture_writer.write(" ")
                         self.picture_position_writer.write(" ")
@@ -1261,9 +1177,11 @@ class PPOTrainerO(BaseRLTrainerOracle):
 
         current_episode_reward += reward
         running_episode_stats["reward"] += (1 - masks) * current_episode_reward
-        current_episode_exp_area = exp_area
+        current_episode_exp_area += exp_area
         running_episode_stats["exp_area"] += (1 - masks) * current_episode_exp_area
         running_episode_stats["count"] += 1 - masks
+        current_episode_ci += ci
+        running_episode_stats["ci"] += (1 - masks) * current_episode_ci
 
         for k, v in self._extract_scalars_from_infos(infos).items():
             v = torch.tensor(
@@ -1279,6 +1197,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
     
         current_episode_reward *= masks
         current_episode_exp_area *= masks
+        current_episode_ci *= masks
 
         if self._static_encoder:
             with torch.no_grad():
@@ -1349,9 +1268,6 @@ class PPOTrainerO(BaseRLTrainerOracle):
         
         self.take_picture_writer = log_manager.createLogWriter("take_picture")
         self.picture_position_writer = log_manager.createLogWriter("picture_position")
-        
-        self._ci = 0.0
-        self._take_picture = 0
 
         self.envs = construct_envs(
             self.config, get_env_class(self.config.ENV_NAME)
@@ -1397,12 +1313,14 @@ class PPOTrainerO(BaseRLTrainerOracle):
         batch = None
         observations = None
 
-        current_episode_reward = torch.zeros(self.envs.num_envs, 1)
-        current_episode_exp_area = torch.zeros(self.envs.num_envs, 1)
+        current_episode_reward = torch.zeros(self.envs.num_envs, 1, device=self.device)
+        current_episode_exp_area = torch.zeros(self.envs.num_envs, 1, device=self.device)
+        current_episode_ci = torch.zeros(self.envs.num_envs, 1, device=self.device)
         running_episode_stats = dict(
-            count=torch.zeros(self.envs.num_envs, 1),
-            reward=torch.zeros(self.envs.num_envs, 1),
-            exp_area=torch.zeros(self.envs.num_envs, 1),
+            count=torch.tensor(torch.zeros(self.envs.num_envs, 1), device=current_episode_reward.device),
+            reward=torch.tensor(torch.zeros(self.envs.num_envs, 1), device=current_episode_reward.device),
+            exp_area=torch.tensor(torch.zeros(self.envs.num_envs, 1), device=current_episode_reward.device),
+            ci=torch.tensor(torch.zeros(self.envs.num_envs, 1), device=current_episode_reward.device),
         )
         window_episode_stats = defaultdict(
             lambda: deque(maxlen=ppo_cfg.reward_window_size)
@@ -1440,7 +1358,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
                         delta_env_time,
                         delta_steps,
                     ) = self._collect_rollout_step(
-                        rollouts, current_episode_reward, current_episode_exp_area, running_episode_stats
+                        rollouts, current_episode_reward, current_episode_exp_area, current_episode_ci, running_episode_stats
                     )
                     pth_time += delta_pth_time
                     env_time += delta_env_time
@@ -1459,23 +1377,13 @@ class PPOTrainerO(BaseRLTrainerOracle):
 
                 deltas = {
                     k: (
-                        (v[-1] - v[-2]).sum().item()
+                        (v[-1] - v[0]).sum().item()
                         if len(v) > 1
                         else v[0].sum().item()
                     )
                     for k, v in window_episode_stats.items()
                 }
                 deltas["count"] = max(deltas["count"], 1.0)
-
-                #tensor board
-                """
-                writer.add_scalar(
-                    "train/reward", deltas["reward"] / deltas["count"], count_steps
-                )
-                writer.add_scalar(
-                    "train/learning_rate", lr_scheduler._last_lr[0], count_steps
-                )
-                """
                 
                 #csv
                 reward_logger.writeLine(str(count_steps) + "," + str(deltas["reward"] / deltas["count"]))
@@ -1493,27 +1401,6 @@ class PPOTrainerO(BaseRLTrainerOracle):
                     total_look_down_actions
                 )
                 
-                """
-                writer.add_scalar(
-                    "train/found_action_prob", total_found_actions/total_actions, count_steps
-                )
-                writer.add_scalar(
-                    "train/forward_action_prob", total_forward_actions/total_actions, count_steps
-                )
-                writer.add_scalar(
-                    "train/left_action_prob", total_left_actions/total_actions, count_steps
-                )
-                writer.add_scalar(
-                    "train/right_action_prob", total_right_actions/total_actions, count_steps
-                )
-                writer.add_scalar(
-                    "train/look_up_action_prob", total_look_up_actions/total_actions, count_steps
-                )
-                writer.add_scalar(
-                    "train/look_down_action_prob", total_look_down_actions/total_actions, count_steps
-                )
-                """
-                
                 # csv
                 action_logger.writeLine(
                     str(count_steps) + "," + str(total_found_actions/total_actions) + ","
@@ -1528,27 +1415,15 @@ class PPOTrainerO(BaseRLTrainerOracle):
                 }
 
                 if len(metrics) > 0:
-                    # tensor board
-                    """
-                    writer.add_scalar("metrics/picture", metrics["picture"], count_steps)
-                    writer.add_scalar("metrics/ci", metrics["ci"], count_steps)
-                    writer.add_scalar("metrics/episode_length", metrics["episode_length"], count_steps)
-                    """
-                    
-                    logger.info("CI:" + str(self._ci/deltas["count"]) + " TAKE_PICTURE:" + str(self._take_picture / deltas["count"]))
-                    metrics_logger.writeLine(str(count_steps) + "," +str(self._take_picture / deltas["count"]) + "," + str(self._ci/deltas["count"]) + "," + str(metrics["exp_area"]) + "," + str(metrics["raw_metrics.agent_path_length"]))
-                    self._ci = 0.0
-                    self._take_picture = 0
-                    
+                    logger.info("COUNT: " + str(deltas["count"]))
+                    #logger.info("CI:" + str(self._ci/deltas["count"]) + " TAKE_PICTURE:" + str(self._take_picture / deltas["count"]))
+                    logger.info("CI:" + str(metrics["ci"]))
+                    logger.info("REWARD: " + str(deltas["reward"] / deltas["count"]))
+                    #metrics_logger.writeLine(str(count_steps) + "," +str(self._take_picture / deltas["count"]) + "," + str(self._ci/deltas["count"]) + "," + str(metrics["exp_area"]) + "," + str(metrics["raw_metrics.agent_path_length"]))
+                    metrics_logger.writeLine(str(count_steps) + "," + str(metrics["ci"]) + "," + str(metrics["exp_area"]) + "," + str(metrics["raw_metrics.agent_path_length"]))
+                
                     #csv
                     logger.info(metrics)
-
-                    
-                # tensor board
-                """
-                writer.add_scalar("train/losses_value", value_loss, count_steps)
-                writer.add_scalar("train/losses_policy", action_loss, count_steps)
-                """
                 
                 # csv
                 loss_logger.writeLine(str(count_steps) + "," + str(value_loss) + "," + str(action_loss))
@@ -1612,24 +1487,31 @@ class PPOTrainerO(BaseRLTrainerOracle):
         num = 0 #fog_mapのMAP_VALID_POINTの数
         num_covered = 0 #pre_fog_mapと被っているグリッド数
         
-        for i in range(y):
-            for j in range(x):
-                # fog_mapで写真を撮っている範囲の時
-                if fog_map[i][j] == 1:
-                    num += 1
-                    # fogとpre_fogがかぶっている時
-                    if pre_fog_map[i][j] == 1:
-                        num_covered += 1
-                        
-        if num == 0:
-            per = 0.0
-        else:
-            per = num_covered / num
+        y_pre = len(pre_fog_map)
+        x_pre = len(pre_fog_map[0])
         
-        if per < threshold:
-            return False
+        
+        if (x==x_pre) and (y==y_pre):
+            for i in range(y):
+                for j in range(x):
+                    # fog_mapで写真を撮っている範囲の時
+                    if fog_map[i][j] == 1:
+                        num += 1
+                        # fogとpre_fogがかぶっている時
+                        if pre_fog_map[i][j] == 1:
+                            num_covered += 1
+                            
+            if num == 0:
+                per = 0.0
+            else:
+                per = num_covered / num
+            
+            if per < threshold:
+                return False
+            else:
+                return True
         else:
-            return True
+            False
         
     # fog_mapがidx以外のpre_fog_mapと被っている割合を算出
     def _cal_rate_of_fog_other(self, fog_map, pre_fog_of_war_map_list, cover_list, idx):
@@ -1696,16 +1578,13 @@ class PPOTrainerO(BaseRLTrainerOracle):
         #ログ出力設定
         #time, reward
         eval_reward_logger = log_manager.createLogWriter("reward")
-        #time, take_picture, ci, exp_area, path_length
+        #time, ci, exp_area, path_length
         eval_metrics_logger = log_manager.createLogWriter("metrics")
-        eval_take_picture_writer = log_manager.createLogWriter("take_picture")
-        eval_picture_position_writer = log_manager.createLogWriter("picture_position")
-        
-        self._ci = 0.0
-        self._take_picture = 0
+        #eval_take_picture_writer = log_manager.createLogWriter("take_picture")
+        #eval_picture_position_writer = log_manager.createLogWriter("picture_position")
         
         #フォルダがない場合は、作成
-        p_dir = pathlib.Path("./log/" + date + "/val/Matrics")
+        p_dir = pathlib.Path("./log/" + date + "/eval/Matrics")
         if not p_dir.exists():
             p_dir.mkdir(parents=True)
         
@@ -1751,6 +1630,9 @@ class PPOTrainerO(BaseRLTrainerOracle):
             self.envs.num_envs, 1, device=self.device
         )
         current_episode_exp_area = torch.zeros(
+            self.envs.num_envs, 1, device=self.device
+        )
+        current_episode_ci = torch.zeros(
             self.envs.num_envs, 1, device=self.device
         )
         
@@ -1814,29 +1696,31 @@ class PPOTrainerO(BaseRLTrainerOracle):
             
             reward = []
             ci = []
-            exp_area = []
-            matrics = []
+            exp_area = [] # 探索済みのエリア()
+            exp_area_pre = []
+            #matrics = []
             fog_of_war_map = []
-            top_down_map = []
+            top_down_map = [] 
             n_envs = self.envs.num_envs
             for i in range(n_envs):
                 reward.append(rewards[i][0][0])
                 ci.append(rewards[i][0][1])
-                exp_area.append(rewards[i][0][2])
-                matrics.append(rewards[i][1])
+                exp_area.append(rewards[i][0][2]-rewards[i][0][3])
+                exp_area_pre.append(rewards[i][0][3])
+                #matrics.append(rewards[i][1])
                 fog_of_war_map.append(infos[i]["picture_range_map"]["fog_of_war_mask"])
                 top_down_map.append(infos[i]["picture_range_map"]["map"])
             
             for n in range(len(observations)):
-                #TAKE_PICTUREが呼び出されたかを検証
+            #TAKE_PICTUREが呼び出されたかを検証
                 if ci[n] != -sys.float_info.max:
                     # 今回撮ったpicture(p_n)が保存してあるpicture(p_k)とかぶっているkを保存
                     cover_list = [] 
                     picture_range_map = self._create_picture_range_map(top_down_map[n], fog_of_war_map[n])
-                    self._take_picture += 1
+                    
                     # p_kのそれぞれのpicture_range_mapのリスト
                     pre_fog_of_war_map = [sublist[2] for sublist in self._taken_picture_list[n]]
-                    
+                        
                     # それぞれと閾値より被っているか計算
                     idx = -1
                     min_ci = ci[n]
@@ -1844,12 +1728,12 @@ class PPOTrainerO(BaseRLTrainerOracle):
                         # 閾値よりも被っていたらcover_listにkを追加
                         if self._check_percentage_of_fog(picture_range_map, pre_fog_of_war_map[k]) == True:
                             cover_list.append(k)
-                            
+                                
                         #ciの最小値の写真を探索(１つも被っていない時用)
                         if min_ci < self._taken_picture_list[n][idx][0]:
                             idx = k
                             min_ci = self._taken_picture_list[n][idx][0]
-                        
+                            
                     # 今までの写真と多くは被っていない時
                     if len(cover_list) == 0:
                         #範囲が多く被っていなくて、self._num_picture回未満写真を撮っていたらそのまま保存
@@ -1857,7 +1741,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
                             self._taken_picture_list[n].append([ci[n], observations[n]["agent_position"], picture_range_map])
                             self._taken_picture[n].append(observations[n]["rgb"])
                             reward[n] += ci[n]
-                            
+                                
                         #範囲が多く被っていなくて、self._num_picture回以上写真を撮っていたら
                         else:
                             # 今回の写真が保存してある写真の１つでもCIが高かったらCIが最小の保存写真と入れ替え
@@ -1865,8 +1749,11 @@ class PPOTrainerO(BaseRLTrainerOracle):
                                 ci_pre = self._taken_picture_list[n][idx][0]
                                 self._taken_picture_list[n][idx] = [ci[n], observations[n]["agent_position"], picture_range_map]
                                 self._taken_picture[n][idx] = observations[n]["rgb"]   
-                                reward[n] += (ci[n] - ci_pre)     
-                        
+                                reward[n] += (ci[n] - ci_pre) 
+                                ci[n] -= ci_pre
+                            
+                            ci[n] = 0.0    
+                            
                     # 1つとでも多く被っていた時    
                     else:
                         min_idx = -1
@@ -1877,24 +1764,32 @@ class PPOTrainerO(BaseRLTrainerOracle):
                             if self._taken_picture_list[n][idx_k][0] < min_ci_k:
                                 min_ci_k = self._taken_picture_list[n][idx_k][0]
                                 min_idx = idx_k
-                                
+                                    
                         # 被った割合分小さくなったCIでも保存写真の中の最小のCIより大きかったら交換
                         if self._compareWithChangedCI(picture_range_map, pre_fog_of_war_map, cover_list, ci[n], min_ci_k, min_idx) == True:
                             self._taken_picture_list[n][min_idx] = [ci[n], observations[n]["agent_position"], picture_range_map]
                             self._taken_picture[n][min_idx] = observations[n]["rgb"]   
                             reward[n] += (ci[n] - min_ci_k)  
+                            ci[n] -= min_ci_k
+                        
+                        ci[n] = 0.0
+                else:
+                    ci[n] = 0.0
                 
             
             reward = torch.tensor(
                 reward, dtype=torch.float, device=self.device
             ).unsqueeze(1)
-            exp_area = np.array(exp_area)
             exp_area = torch.tensor(
                 exp_area, dtype=torch.float, device=self.device
+            ).unsqueeze(1)
+            ci= torch.tensor(
+                ci, dtype=torch.float, device=current_episode_reward.device
             ).unsqueeze(1)
 
             current_episode_reward += reward
             current_episode_exp_area += exp_area
+            current_episode_ci += ci
             next_episodes = self.envs.current_episodes()
             envs_to_pause = []
 
@@ -1907,33 +1802,34 @@ class PPOTrainerO(BaseRLTrainerOracle):
 
                 # episode ended
                 if not_done_masks[i].item() == 0:
-                    logger.info("Exp_area: " + str(current_episode_exp_area[i]))
+                    """
+                    #logger.info("Exp_area: " + str(current_episode_exp_area[i]))
                     eval_take_picture_writer.write(str(len(stats_episodes)) + "," + str(current_episodes[i].episode_id) + "," + str(n))
                     eval_picture_position_writer.write(str(len(stats_episodes)) + "," + str(current_episodes[i].episode_id) + "," + str(n))
                     for j in range(self._num_picture):
                         if j < len(self._taken_picture_list[i]):
                             eval_take_picture_writer.write(str(self._taken_picture_list[i][j][0]))
                             eval_picture_position_writer.write(str(self._taken_picture_list[i][j][1][0]) + "," + str(self._taken_picture_list[i][j][1][1]) + "," + str(self._taken_picture_list[i][j][1][2]))
-                            self._ci += self._taken_picture_list[i][j][0]
                         else:
                             eval_take_picture_writer.write(" ")
                             eval_picture_position_writer.write(" ")
                         
                     eval_take_picture_writer.writeLine()
                     eval_picture_position_writer.writeLine()
-
-                    next_episodes = self.envs.current_episodes()
-                    envs_to_pause = []
+                    """
                     
                     pbar.update()
                     episode_stats = dict()
                     episode_stats["reward"] = current_episode_reward[i].item()
                     episode_stats["exp_area"] = current_episode_exp_area[i].item()
+                    episode_stats["ci"] = current_episode_ci[i].item()
+                    
                     episode_stats.update(
                         self._extract_scalars_from_info(infos[i])
                     )
                     current_episode_reward[i] = 0
                     current_episode_exp_area[i] = 0
+                    current_episode_ci[i] = 0
                     # use scene_id + episode_id as unique id for storing stats
                     stats_episodes[
                         (
@@ -2008,12 +1904,14 @@ class PPOTrainerO(BaseRLTrainerOracle):
                             logger.info("Picture created: " + path)
                         
                         #Save score_matrics
+                        """
                         if matrics[i] is not None:
                             eval_matrics_logger = log_manager.createLogWriter("Matrics/matrics_" + str(current_episodes[i].episode_id) + "_" + str(checkpoint_index))
                             for j in range(matrics[i].shape[0]):
                                 for k in range(matrics[i].shape[1]):
                                     eval_matrics_logger.write(str(matrics[i][j][k]))
                                 eval_matrics_logger.writeLine("")
+                        """
                             
                             
                         rgb_frames[i] = []
@@ -2031,6 +1929,8 @@ class PPOTrainerO(BaseRLTrainerOracle):
                 test_recurrent_hidden_states,
                 not_done_masks,
                 current_episode_reward,
+                current_episode_exp_area,
+                current_episode_ci,
                 prev_actions,
                 batch,
                 rgb_frames,
@@ -2040,10 +1940,13 @@ class PPOTrainerO(BaseRLTrainerOracle):
                 test_recurrent_hidden_states,
                 not_done_masks,
                 current_episode_reward,
+                current_episode_exp_area,
+                current_episode_ci,
                 prev_actions,
                 batch,
                 rgb_frames,
             )
+
 
         num_episodes = len(stats_episodes)
         
@@ -2062,40 +1965,12 @@ class PPOTrainerO(BaseRLTrainerOracle):
         step_id = checkpoint_index
         if "extra_state" in ckpt_dict and "step" in ckpt_dict["extra_state"]:
             step_id = ckpt_dict["extra_state"]["step"]
-            
-        """
-        writer.add_scalar("eval/average_reward", aggregated_stats["reward"],
-            step_id,
-        )
-        """
         
         eval_reward_logger.writeLine(str(step_id) + "," + str(aggregated_stats["reward"]))
 
         metrics = {k: v for k, v in aggregated_stats.items() if k != "reward"}
-        """
-        writer.add_scalar("eval/episode_length", metrics["episode_length"], step_id)
-        writer.add_scalar("eval/picture", metrics["picture"], step_id)
-        writer.add_scalar("eval/ci", metrics["ci"], step_id)
-        """
 
-        logger.info("CI:" + str(self._ci/num_episodes) + " TAKE_PICTURE:" + str(self._take_picture / num_episodes))
-        eval_metrics_logger.writeLine(str(step_id) + "," +str(self._take_picture / num_episodes) + "," + str(self._ci/ num_episodes) + "," + str(metrics["exp_area"]) + "," + str(metrics["raw_metrics.agent_path_length"]))
-        self._ci = 0.0
-        self._take_picture = 0
-        
-
-        ##Dump metrics JSON
-        if 'RAW_METRICS' in config.TASK_CONFIG.TASK.MEASUREMENTS:
-            if not os.path.exists(config.TENSORBOARD_DIR_EVAL +'/metrics'):
-                os.mkdir(config.TENSORBOARD_DIR_EVAL +'/metrics')
-            with open(config.TENSORBOARD_DIR_EVAL + '/metrics/' + checkpoint_path.split('/')[-1] + '.json', 'w') as fp:
-                json.dump(raw_metrics_episodes, fp)
-
-        # if not os.path.exists(config.TENSORBOARD_DIR_EVAL +'/traj_metrics'):
-        #     os.mkdir(config.TENSORBOARD_DIR_EVAL +'/traj_metrics')
-        # with open(config.TENSORBOARD_DIR_EVAL +'/traj_metrics/' + checkpoint_path.split('/')[-1] + '.json', 'w') as fp:
-        #     json.dump(traj_metrics_episodes, fp)
-
-
+        logger.info("CI:" + str(metrics["ci"]))
+        eval_metrics_logger.writeLine(str(step_id) + "," + str(metrics["ci"]) + "," + str(metrics["exp_area"]) + "," + str(metrics["raw_metrics.agent_path_length"]))
 
         self.envs.close()

@@ -2,15 +2,14 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import pathlib
 
-date = "23-08-18 12-35-30"
-date = "23-08-18 18-53-17"
+date = "23-10-08 10-55-52"
+#date = "23-10-03 14-28-11"
 mode = "train"
 
-df = pd.read_csv("log/" + date + "/" + mode + "/action_prob.csv", names=['time', 'take_picture', 'forward', 'left', 'right', 'look_up', 'look_down'], header=None)
-plt.plot(df['time'], df['take_picture'], color="red", label="Take Picture")
-plt.plot(df['time'], df['forward'], color="blue", label="Move Forward")
-plt.plot(df['time'], df['left'], color="green", label="Turn Left")
-plt.plot(df['time'], df['right'], color="black", label="Turn Right")
+df = pd.read_csv("log/" + date + "/" + mode + "/action_prob.csv", names=['time', 'forward', 'left', 'right', 'look_up', 'look_down', 'take_picture'], header=None)
+plt.plot(df['time'], df['forward'], color="red", label="Move Forward")
+plt.plot(df['time'], df['left'], color="blue", label="Turn Left")
+plt.plot(df['time'], df['right'], color="green", label="Turn Right")
 
 #ラベルの追加
 plt.xlabel('Training Steps')

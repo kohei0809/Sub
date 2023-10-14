@@ -250,8 +250,10 @@ def observations_to_image(observation: Dict, info: Dict, action: np.ndarray, max
     if "collisions" in info and info["collisions"]["is_collision"]:
         egocentric_view = draw_collision(egocentric_view)
 
+    """
     if action[0] == 0:
         egocentric_view = draw_found(egocentric_view)
+    """
 
     frame = egocentric_view
 

@@ -6,5 +6,6 @@
 
 from habitat_baselines.common.base_trainer import BaseRLTrainerNonOracle, BaseRLTrainerOracle, BaseTrainer
 from habitat_baselines.rl.ppo.ppo_trainer import PPOTrainerO, PPOTrainerNO, RolloutStorageOracle, RolloutStorageNonOracle
+from habitat_baselines.rl.ppo.ppo_trainer_sub import PPOTrainerO2
 
-__all__ = ["BaseTrainer", "BaseRLTrainerNonOracle", "BaseRLTrainerOracle", "PPOTrainerO", "PPOTrainerNO", "RolloutStorage", "RolloutStorageOracle", "RolloutStorageNonOracle"]
+__all__ = ["BaseTrainer", "BaseRLTrainerNonOracle", "BaseRLTrainerOracle", "PPOTrainerO", "PPOTrainerO2", "PPOTrainerNO", "RolloutStorage", "RolloutStorageOracle", "RolloutStorageNonOracle"]

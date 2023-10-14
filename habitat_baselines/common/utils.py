@@ -182,11 +182,6 @@ def generate_video(
     if "disk" in video_option:
         assert video_dir is not None
         images_to_video(images, video_dir, video_name)
-    if "tensorboard" in video_option:
-        tb_writer.add_video_from_np_images(
-            f"episode{episode_id}", checkpoint_idx, images, fps=fps
-        )
-
 
 def quat_from_angle_axis(theta: float, axis: np.ndarray) -> np.quaternion:
     r"""Creates a quaternion from angle axis format

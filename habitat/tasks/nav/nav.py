@@ -82,6 +82,17 @@ class RoomGoal(NavigationGoal):
 @attr.s(auto_attribs=True, kw_only=True)
 class MaximumInformationEpisode(Episode):
     start_room: Optional[str] = None
+    shortest_paths: Optional[List[ShortestPathPoint]] = None
+    ########################################
+    """
+    goals: List[NavigationGoal] = attr.ib(
+        default=None, validator=not_none_validator
+    )
+    object_category: Optional[List[str]] = None
+    object_index: Optional[int] = None
+    currGoalIndex: Optional[int] = 0 
+    """
+    ########################################
 
 @attr.s(auto_attribs=True, kw_only=True)
 class NavigationEpisode(Episode):
@@ -516,6 +527,7 @@ class CI(Measure):
         W = semantic_obs.shape[1]
         size = H * W
         imp_matrics = np.zeros((H, W))
+        imp_matrics = None
     
         #objectのスコア別リスト
         #void, wall, floor, door, stairs, ceiling, column, railing
@@ -557,7 +569,7 @@ class CI(Measure):
                 
                 score = w * v / d
                 ci += score
-                imp_matrics[i][j] = score
+                #imp_matrics[i][j] = score
         
         ci *= max(len(category), 1.0)
         ci /= size
@@ -1178,12 +1190,16 @@ class TopDownMap(Measure):
 
     def _draw_goals_positions(self, episode):
         if self._config.DRAW_GOAL_POSITIONS:
+            #logger.info("DRAW_GOAL!!!!!!!!!!!!!")
 
+            #i = 0
             for goal in episode.goals:
                 try:
                     self._draw_point(
                         goal.position, maps.MAP_TARGET_POINT_INDICATOR
                     )
+                    #logger.info("!!!!!!!!!!!!!!THIS IS GOAL: " + str(i))
+                    #i+=1
                 except AttributeError:
                     pass
 
@@ -1275,10 +1291,14 @@ class TopDownMap(Measure):
 
         self.update_fog_of_war_mask(np.array([a_x, a_y]))
 
+        #####################################################
+        """
         # draw source and target parts last to avoid overlap
-        #self._draw_goals_view_points(episode)
-        #self._draw_goals_aabb(episode)
-        #self._draw_goals_positions(episode)
+        self._draw_goals_view_points(episode)
+        self._draw_goals_aabb(episode)
+        self._draw_goals_positions(episode)
+        """
+        #####################################################
 
         #self._draw_shortest_path(episode, agent_position)
 

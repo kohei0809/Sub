@@ -35,3 +35,26 @@ def _try_register_maximuminfodatasetv1():
         class MaximumInfoDatasetImportError(Dataset):
             def __init__(self, *args, **kwargs):
                 raise pointnav_import_error
+            
+
+def _try_register_maximuminfodatasetv2():
+    try:
+        from habitat.datasets.maximum_info.maximuminfo_dataset import (
+            MaximumInfoDatasetV2,
+        )
+
+        has_pointnav = True
+    except ImportError as e:
+        has_pointnav = False
+        pointnav_import_error = e
+
+    if has_pointnav:
+        from habitat.datasets.maximum_info.maximuminfo_dataset import (
+            MaximumInfoDatasetV2,
+        )
+    else:
+            
+        @registry.register_dataset(name="MaximumInfo-v2")
+        class MaximumInfoDatasetImportError(Dataset):
+            def __init__(self, *args, **kwargs):
+                raise pointnav_import_error

@@ -1,6 +1,6 @@
 #!/bin/sh
 #$ -cwd
-#$ -l f_node=4
+#$ -l f_node=1
 #$ -j y
 #$ -l h_rt=24:00:00
 #$ -o output/o.$JOB_ID
@@ -14,4 +14,4 @@ module load nccl
 module load cudnn
 module load openmpi/3.1.4-opa10.10
 
-singularity exec -f --nv --bind /gs/hs0/tga-aklab/matsumoto://root/work ./../nvidia_cudagl.img ./work/Main2/exec.sh
+singularity exec -f --nv --bind /gs/hs0/tga-aklab/matsumoto://root/work ./../nvidia_cudagl.img ./work/Main2/exec_graph.sh

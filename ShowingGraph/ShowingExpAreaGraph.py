@@ -2,14 +2,12 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import pathlib
 
-date = "23-08-18 12-35-30"
-date = "23-08-18 18-53-17"
-date = "23-08-27 21-24-26"
-#date = "23-09-03 02-46-00"
+date = "23-10-10 13-36-40"
+#date = "23-10-03 14-28-11"
 mode = "train"
-mode = "val"
+mode = "eval"
 
-df = pd.read_csv("log/" + date + "/" + mode + "/metrics.csv", names=['time', 'picture', 'ci', 'exp_area', 'path_length'], header=None)
+df = pd.read_csv("log/" + date + "/" + mode + "/metrics.csv", names=['time', 'ci', 'exp_area', 'path_length'], header=None)
 df['exp_area'] /= (0.8*0.8*0.1)
 df['exp_area'] /= 900
 plt.plot(df['time'], df['exp_area'], color="blue", label="Exp Area")
